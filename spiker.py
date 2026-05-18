@@ -2,7 +2,12 @@ import discord
 from discord.ext import commands
 import asyncio
 import random
+from flask import Flask
+import threading
 
+app = Flask('')
+@app.route('/')
+def home(): return "Bot aktif!"
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -278,6 +283,6 @@ async def maçbitir(ctx):
     takim_1_adi, takim_1_kadro = "Ev Sahibi", []
     takim_2_adi, takim_2_kadro = "Deplasman", []
     await ctx.send("⏹ Spiker Erdem ve Berat yayını acil durum nedeniyle erken kapatıyor, takımlar sıfırlandı.")
-
+threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
 # BOT TOKENİNİ BURAYA YAPIŞTIR
 bot.run("BURADA_SENIN_GIZLI_BOT_SIFREN_YAZIYOR")
