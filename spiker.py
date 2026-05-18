@@ -3,287 +3,587 @@ from discord.ext import commands
 import asyncio
 import random
 from flask import Flask
-import threadingi 
+import threading
 import os
 
-app = Flask('')
-@app.route('/')
-def home(): return "Bot aktif!"
+# =========================
+# FLASK SERVER
+# =========================
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot aktif!"
+
+def run_web():
+    app.run(host="0.0.0.0", port=8080)
+
+threading.Thread(target=run_web).start()
+
+# =========================
+# DISCORD BOT
+# =========================
+
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+
+bot = commands.Bot(
+    command_prefix="!",
+    intents=intents
+)
+
+# =========================
+# GLOBAL
+# =========================
 
 mac_devam_ediyor = False
-takim_1_adi = "Ev Sahibi"
-takim_1_kadro = []
-takim_2_adi = "Deplasman"
-takim_2_kadro = []
 
-# Kart takibi için sözlük
+takim_1_adi = "Ev Sahibi"
+takim_1_kadro = {}
+
+takim_2_adi = "Deplasman"
+takim_2_kadro = {}
+
 sari_kartlar = {}
 
-# Detaylı Pozisyon Havuzu
+# =========================
+# POZİSYONLAR
+# =========================
+
 normal_pozisyonlar = [
-    "orta sahada şık bir çalımla önünü boşalttı, pasını aktarıyor.",
-    "sağ kanattan adeta bir rüzgar gibi çizgiye indi, içeriye kesiyor!",
-    "ceza sahası dışından kaleyi gördü, sert vurdu! Kaleci iki hamlede kontrol ediyor.",
-    "savunmanın arkasına sızdı ama yardımcı hakemin bayrağı havada! Ofsayt!",
-    "uzak köşeye harika plase gönderdi, top az farkla auta çıkıyor!",
-    "kornerden gelen topa harika yükseldi, kafa vuruşu! Üst ağlarda kaldı.",
-    "rakiplerini tek tek ipe dizdi, ceza sahasına girdi ama son anda savunma ayak koydu!"
+    "orta sahada çalımlar atıyor!",
+    "sağ kanattan indi!",
+    "ceza sahası dışından vurdu!",
+    "savunma arkasına sarktı!",
+    "uzak köşeye plase gönderdi!",
+    "harika kafa vurdu!",
+    "rakiplerini geçti!"
 ]
 
 stoper_pozisyonlar = [
-    "son adam pozisyonunda inanılmaz bir kademeyle {hucumcu}'nun şutunu engelledi! Muazzam müdahale!",
-    "kaleciyle karşı karşıya kalacaktı ama {defans} adeta gövdesini siper etti ve topu kaptı!",
-    "hava topu mücadelesinde {hucumcu}'ya geçit vermedi, topu uzaklaştırıyor."
+    "{defans} kritik müdahaleyi yaptı!",
+    "{defans} son anda araya girdi!",
+    "{defans} topu uzaklaştırdı!"
 ]
 
 direk_pozisyonlar = [
-    "ceza sahası çizgi üzerinden füze gönderdi! VE TOP DİREKTEN DÖNDÜ! İnanılmaz bir an!",
-    "kalecinin öne çıktığını gördü, aşırtma vuruş... ÇAT! Direğe çarpan top oyun alanına geri dönüyor!"
+    "ŞUT VE TOP DİREKTEN DÖNDÜ!",
+    "Top direkten geri geldi!"
 ]
 
 faul_pozisyonlar = [
-    "hızla ilerleyen {hucumcu}'yu arkadan çekerek durdurdu. Hakem faul noktasını gösteriyor.",
-    "orta sahada {hucumcu}'ya sert bir müdahalede bulundu. Hakem oyunu durdurdu."
+    "{hucumcu} yerde kaldı, faul!",
+    "{hucumcu}'ya sert müdahale!"
 ]
+
+# =========================
+# BOT READY
+# =========================
 
 @bot.event
 async def on_ready():
-    print(f"Kadro motoru hazır. Bot {bot.user} olarak giriş yaptı!")
+    print(f"Bot aktif: {bot.user}")
 
-@bot.command()
+# =========================
+# TAKIM KUR
+# =========================
+
+@bot.command(name="takimkur")
 async def takimkur(ctx, *, icerik: str):
-    global takim_1_adi, takim_1_kadro, takim_2_adi, takim_2_kadro
+
+    global takim_1_adi
+    global takim_1_kadro
+
+    global takim_2_adi
+    global takim_2_kadro
+
     try:
+
         parcalar = icerik.split("/")
+
         takim_adi = parcalar[0].strip()
-        oyuncular = [o.strip() for o in parcalar[1].split(",")]
-        
-        if not takim_1_kadro or takim_1_adi == "Ev Sahibi":
+
+        oyuncular = {}
+
+        for oyuncu in parcalar[1].split(","):
+
+            veri = oyuncu.strip()
+
+            if ":" in veri:
+
+                mevki, isim = veri.split(":", 1)
+
+                oyuncular[isim.strip()] = mevki.strip().upper()
+
+        if not takim_1_kadro:
+
             takim_1_adi = takim_adi
             takim_1_kadro = oyuncular
-            await ctx.send(f"⚽ **{takim_1_adi}** kuruldu! Kadro: {', '.join(takim_1_kadro)}")
+
+            ilk11 = "\n".join(
+                [
+                    f"{mevki} - {isim}"
+                    for isim, mevki
+                    in takim_1_kadro.items()
+                ]
+            )
+
+            await ctx.send(
+                f"⚽ {takim_1_adi} kuruldu!\n\n"
+                f"{ilk11}"
+            )
+
         else:
+
             takim_2_adi = takim_adi
             takim_2_kadro = oyuncular
-            await ctx.send(f"⚽ **{takim_2_adi}** kuruldu! Kadro: {', '.join(takim_2_kadro)}")
+
+            ilk11 = "\n".join(
+                [
+                    f"{mevki} - {isim}"
+                    for isim, mevki
+                    in takim_2_kadro.items()
+                ]
+            )
+
+            await ctx.send(
+                f"⚽ {takim_2_adi} kuruldu!\n\n"
+                f"{ilk11}"
+            )
+
     except:
-        await ctx.send("❌ Hatalı kullanım! Örnek: `!takımkur Beşiktaş / Oyuncu1, Oyuncu2`")
 
-async def kart_kontrol(ctx, oyuncu, takim_adi, kadro):
+        await ctx.send(
+            "❌ Kullanım:\n\n"
+            "!takimkur Galatasaray /\n"
+            "GK: Muslera,\n"
+            "RB: Kaan Ayhan,\n"
+            "CB: Davinson,\n"
+            "LB: Köhn,\n"
+            "CM: Torreira,\n"
+            "RW: Ziyech,\n"
+            "LW: Kerem,\n"
+            "ST: Icardi"
+        )
+
+# =========================
+# KART KONTROL
+# =========================
+
+async def kart_kontrol(
+    ctx,
+    oyuncu,
+    takim_adi,
+    kadro
+):
+
     kart_sansi = random.random()
-    
-    # %50 ihtimalle hakem sadece sözlü uyarır, kart vermez
-    if kart_sansi < 0.50:
-        await ctx.send(f"🗣 **[Erdem]:** Hakem oraya gitti, {oyuncu}'yu sert bir dille uyarıyor ama kart çıkmadı.\n🗣 **[Berat]:** Evet Erdem, bu dakikada hakem kartına başvurmak istemedi.")
-    
-    # %40 ihtimalle sarı kart
-    elif kart_sansi < 0.90:
-        if oyuncu not in sari_kartlar:
-            sari_kartlar[oyuncu] = 1
-            await ctx.send(f"🟨 **[Erdem]:** Ve hakem elini cebine attı! {takim_adi} takımından **{oyuncu}** sarı kart görüyor!")
-        else:
-            sari_kartlar[oyuncu] += 1
-            if sari_kartlar[oyuncu] == 2:
-                await ctx.send(f"🟥 **[Erdem]:** İNANILMAZ BİR AN! {oyuncu}'nun daha önceden sarı kartı vardı! Hakem ikinci sarıdan **KIRMIZI KARTINI** çıkardı!!\n🗣 **[Berat]:** Büyük sorumsuzluk Erdem, takımı {takim_adi} şimdi sahada 10 kişi kaldı!")
-                if oyuncu in kadro:
-                    kadro.remove(oyuncu)
-                    
-    # %10 ihtimalle doğrudan kırmızı kart
-    else:
-        await ctx.send(f"🟥 **[Erdem]:** AMAN ALLAH'IM! DOĞRUDAN KIRMIZI KART! Hakem tereddütsüz kırmızıyı çıkardı! **{oyuncu}** oyundan atılıyor!\n🗣 **[Berat]:** Çok sert bir müdahaleydi Erdem, kırmızı kart son derece haklı bir karar.")
-        if oyuncu in kadro:
-            kadro.remove(oyuncu)
 
-async def pozisyon_oynat(ctx, dakika, t1_skor, t2_skor):
+    if kart_sansi < 0.50:
+
+        await ctx.send(
+            f"🗣 **[Erdem]:** "
+            f"Hakem {oyuncu} oyuncusunu uyardı."
+        )
+
+    elif kart_sansi < 0.90:
+
+        if oyuncu not in sari_kartlar:
+
+            sari_kartlar[oyuncu] = 1
+
+            await ctx.send(
+                f"🟨 **[Erdem]:** "
+                f"{takim_adi} takımından "
+                f"{oyuncu} sarı kart gördü!"
+            )
+
+        else:
+
+            sari_kartlar[oyuncu] += 1
+
+            if sari_kartlar[oyuncu] == 2:
+
+                await ctx.send(
+                    f"🟥 **[Erdem]:** "
+                    f"{oyuncu} ikinci sarıdan atıldı!"
+                )
+
+                if oyuncu in kadro:
+                    del kadro[oyuncu]
+
+    else:
+
+        await ctx.send(
+            f"🟥 **[Erdem]:** "
+            f"DOĞRUDAN KIRMIZI KART!\n"
+            f"{oyuncu} oyundan atıldı!"
+        )
+
+        if oyuncu in kadro:
+            del kadro[oyuncu]
+
+# =========================
+# GOL ŞANSI
+# =========================
+
+def gol_ihtimali(mevki):
+
+    if mevki == "ST":
+        return 0.60
+
+    elif mevki in ["RW", "LW"]:
+        return 0.40
+
+    elif mevki in ["CM"]:
+        return 0.25
+
+    elif mevki in ["RB", "LB"]:
+        return 0.15
+
+    elif mevki in ["CB"]:
+        return 0.08
+
+    return 0.02
+
+# =========================
+# POZİSYON OYNAT
+# =========================
+
+async def pozisyon_oynat(
+    ctx,
+    dakika,
+    t1_skor,
+    t2_skor
+):
+
     if not takim_1_kadro or not takim_2_kadro:
         return t1_skor, t2_skor
 
     secilen_takim = random.choice([1, 2])
+
     olasilik = random.random()
-    
+
     if secilen_takim == 1:
-        atak_takim, defans_takim = takim_1_adi, takim_2_adi
-        atak_kadro, defans_kadro = takim_1_kadro, takim_2_kadro
+
+        atak_takim = takim_1_adi
+        defans_takim = takim_2_adi
+
+        atak_kadro = takim_1_kadro
+        defans_kadro = takim_2_kadro
+
     else:
-        atak_takim, defans_takim = takim_2_adi, takim_1_adi
-        atak_kadro, defans_kadro = takim_2_kadro, takim_1_kadro
 
-    hucumcu = random.choice(atak_kadro)
-    defansci = random.choice(defans_kadro) if defans_kadro else "Savunma"
+        atak_takim = takim_2_adi
+        defans_takim = takim_1_adi
 
-    # 1. SENARYO: STOPER DURDURMASI (%30)
+        atak_kadro = takim_2_kadro
+        defans_kadro = takim_1_kadro
+
+    hucumcu = random.choice(
+        list(atak_kadro.keys())
+    )
+
+    hucum_mevki = atak_kadro[hucumcu]
+
+    if defans_kadro:
+
+        defansci = random.choice(
+            list(defans_kadro.keys())
+        )
+
+    else:
+
+        defansci = "Savunma"
+
+    # STOPER POZİSYONU
     if olasilik < 0.30:
-        pozisyon = random.choice(stoper_pozisyonlar).format(defans=defansci, hucumcu=hucumcu)
-        await ctx.send(f"🎙 **[{dakika}'] [{defans_takim}]** {pozisyon}")
-        
-    # 2. SENARYO: FAUL DURUMU (%20)
+
+        pozisyon = random.choice(
+            stoper_pozisyonlar
+        ).format(defans=defansci)
+
+        await ctx.send(
+            f"🎙 [{dakika}'] "
+            f"[{defans_takim}] "
+            f"{pozisyon}"
+        )
+
+    # FAUL
     elif olasilik < 0.50:
-        pozisyon = random.choice(faul_pozisyonlar).format(savunma=defansci, hucumcu=hucumcu)
-        await ctx.send(f"🎙 **[{dakika}'] [FAUL]** {defansci}, {pozisyon}")
-        # Takılmaya sebep olan sleep kaldırıldı, direkt kart kontrolüne geçiyor
+
+        pozisyon = random.choice(
+            faul_pozisyonlar
+        ).format(hucumcu=hucumcu)
+
+        await ctx.send(
+            f"🎙 [{dakika}'] "
+            f"[FAUL] "
+            f"{pozisyon}"
+        )
+
         if secilen_takim == 1:
-            await kart_kontrol(ctx, defansci, takim_2_adi, takim_2_kadro)
+
+            await kart_kontrol(
+                ctx,
+                defansci,
+                takim_2_adi,
+                takim_2_kadro
+            )
+
         else:
-            await kart_kontrol(ctx, defansci, takim_1_adi, takim_1_kadro)
 
-    # 3. SENARYO: DİREKTEN DÖNEN TOP (%5)
+            await kart_kontrol(
+                ctx,
+                defansci,
+                takim_1_adi,
+                takim_1_kadro
+            )
+
+    # DİREK
     elif olasilik < 0.55:
-        pozisyon = random.choice(direk_pozisyonlar).format(oyuncu=hucumcu)
-        await ctx.send(f"🎙 **[{dakika}'] [{atak_takim}]** {pozisyon}\n🗣 **[Berat]:** İnanılmaz bir şanssızlık anı Erdem, kaleci çaresiz kalmıştı!")
 
-    # 4. SENARYO: NORMAL ATAK VE GOL İHTİMALİ (%45)
+        pozisyon = random.choice(
+            direk_pozisyonlar
+        )
+
+        await ctx.send(
+            f"🎙 [{dakika}'] "
+            f"[{atak_takim}] "
+            f"{pozisyon}"
+        )
+
+    # ATAK
     else:
-        pozisyon = random.choice(normal_pozisyonlar).format(oyuncu=hucumcu)
-        await ctx.send(f"🎙 **[{dakika}'] [{atak_takim}]** {hucumcu} {pozisyon}")
-        
-        if random.random() < 0.35 and ("auta" not in pozisyon and "Ofsayt" not in pozisyon and "kontrol ediyor" not in pozisyon):
-            if secilen_takim == 1:
-                t1_skor += 1
+
+        pozisyon = random.choice(
+            normal_pozisyonlar
+        )
+
+        await ctx.send(
+            f"🎙 [{dakika}'] "
+            f"[{atak_takim}] "
+            f"{hucumcu} ({hucum_mevki}) "
+            f"{pozisyon}"
+        )
+
+        gol_sansi = gol_ihtimali(
+            hucum_mevki
+        )
+
+        if random.random() < gol_sansi:
+
+            # KALECİ
+            kaleciler = [
+                isim
+                for isim, mevki
+                in defans_kadro.items()
+                if mevki == "GK"
+            ]
+
+            kaleci = (
+                kaleciler[0]
+                if kaleciler
+                else "Kaleci"
+            )
+
+            # KURTARIŞ ŞANSI
+            if random.random() < 0.30:
+
+                await ctx.send(
+                    f"🧤 **[Erdem]:** "
+                    f"{kaleci} inanılmaz çıkardı!"
+                )
+
             else:
-                t2_skor += 1
-            await ctx.send(f"⚽ **[Erdem]: GOOOOLLL!! GOOOOLLL!!** {hucumcu} muhteşem vurdu ve top ağlarda!\n🗣 **[Berat]:** Harika bir bitiricilik Erdem, topu adeta iğne deliğinden geçirdi!\n📊 **Skor:** {takim_1_adi} {t1_skor} - {t2_skor} {takim_2_adi}")
+
+                if secilen_takim == 1:
+                    t1_skor += 1
+                else:
+                    t2_skor += 1
+
+                await ctx.send(
+                    f"⚽ **[Erdem]:** "
+                    f"GOOOOLLL!!\n"
+                    f"{hucumcu} ({hucum_mevki}) "
+                    f"ağları havalandırdı!\n\n"
+                    f"📊 Skor:\n"
+                    f"{takim_1_adi} {t1_skor} - "
+                    f"{t2_skor} {takim_2_adi}"
+                )
 
     return t1_skor, t2_skor
 
-@bot.command()
-async def maçbaşlat(ctx):
-    global mac_devam_ediyor, takim_1_adi, takim_1_kadro, takim_2_adi, takim_2_kadro, sari_kartlar
+# =========================
+# MAÇ BAŞLAT
+# =========================
+
+@bot.command(name="macbaslat")
+async def macbaslat(ctx):
+
+    global mac_devam_ediyor
+    global sari_kartlar
+
+    global takim_1_adi
+    global takim_1_kadro
+
+    global takim_2_adi
+    global takim_2_kadro
+
     if not takim_1_kadro or not takim_2_kadro:
-        await ctx.send("❌ Maçı başlatmak için önce iki takımı da kurmalısın!")
+
+        await ctx.send(
+            "❌ Önce iki takım kur!"
+        )
+
         return
+
     if mac_devam_ediyor:
-        await ctx.send("⚠ Maç zaten devam ediyor!")
+
+        await ctx.send(
+            "⚠ Maç zaten devam ediyor!"
+        )
+
         return
-        
+
     mac_devam_ediyor = True
+
     sari_kartlar.clear()
-    t1_skor, t2_skor = 0, 0
-    
-    # --- SPİKER AÇILIŞI VE İLK 11'LER ---
-    await ctx.send(f"🎙 **[Erdem]:** Merhaba sevgili futbolseverler! Muhteşem bir atmosferde, dev derbide karşınızdayız. Yanımda yorumcum Berat var. Berat hoş geldin, heyecan dorukta!")
-    await asyncio.sleep(4)
-    await ctx.send(f"🗣 **[Berat]:** Hoş bulduk Erdem. Gerçekten harika bir hava var, iki takıma da başarılar diliyorum. Kadrolar nefes kesiyor.")
-    await asyncio.sleep(4)
-    
-    # İlk 11'leri sayma
-    await ctx.send(f"📋 **[Erdem]:** Hemen takımların sahaya çıkan kadrolarını aktaralım.\n🏠 **{takim_1_adi} İlk 11:** {', '.join(takim_1_kadro)}")
-    await asyncio.sleep(4)
-    await ctx.send(f"📋 **[Erdem]:** Ve konuk ekip!\n🚀 **{takim_2_adi} İlk 11:** {', '.join(takim_2_kadro)}")
-    await asyncio.sleep(4)
-    await ctx.send(f"🟢 **[Erdem]:** Hakem tribünleri kontrol etti, saatine baktı ve dev maçın başlama düdüğü çaldı! İki takıma da başarılar!")
-    
-    # --- İLK YARI (20 POZİSYON) ---
-    ilk_yari_dakikalar = [2, 4, 7, 9, 11, 14, 16, 19, 21, 24, 26, 28, 31, 33, 35, 38, 40, 42, 44, 45]
-    for dak in ilk_yari_dakikalar:
-        if not mac_devam_ediyor: break
-        await asyncio.sleep(7)
-        t1_skor, t2_skor = await pozisyon_oynat(ctx, dak, t1_skor, t2_skor)
+
+    t1_skor = 0
+    t2_skor = 0
+
+    # =========================
+    # SPİKER AÇILIŞ
+    # =========================
+
+    await ctx.send(
+        f"🎙 **[Erdem]:** "
+        f"Merhaba futbolseverler!\n"
+        f"{takim_1_adi} ile "
+        f"{takim_2_adi} karşı karşıya geliyor!"
+    )
+
+    await asyncio.sleep(3)
+
+    await ctx.send(
+        f"🗣 **[Berat]:** "
+        f"Harika bir atmosfer var Erdem!"
+    )
+
+    await asyncio.sleep(3)
+
+    ilk11_1 = "\n".join(
+        [
+            f"{mevki} - {isim}"
+            for isim, mevki
+            in takim_1_kadro.items()
+        ]
+    )
+
+    ilk11_2 = "\n".join(
+        [
+            f"{mevki} - {isim}"
+            for isim, mevki
+            in takim_2_kadro.items()
+        ]
+    )
+
+    await ctx.send(
+        f"📋 **{takim_1_adi} İlk 11:**\n\n"
+        f"{ilk11_1}"
+    )
+
+    await asyncio.sleep(3)
+
+    await ctx.send(
+        f"📋 **{takim_2_adi} İlk 11:**\n\n"
+        f"{ilk11_2}"
+    )
+
+    await asyncio.sleep(3)
+
+    await ctx.send(
+        "🟢 Hakem düdüğü çaldı "
+        "ve maç başladı!"
+    )
+
+    # =========================
+    # DAKİKALAR
+    # =========================
+
+    dakikalar = list(range(1, 91))
+
+    for dakika in dakikalar:
+
+        if not mac_devam_ediyor:
+            break
+
+        await asyncio.sleep(1.5)
+
+        t1_skor, t2_skor = await pozisyon_oynat(
+            ctx,
+            dakika,
+            t1_skor,
+            t2_skor
+        )
+
+    # =========================
+    # MAÇ SONU
+    # =========================
 
     if mac_devam_ediyor:
-        await ctx.send(f"☕ **[45'+2] [Erdem]:** Ve hakem ilk yarının son düdüğünü çalıyor! İlk 20 pozisyonluk maraton bitti.\n🗣 **[Berat]:** Tempolu ve taktiksel bir ilk yarı izledik Erdem.\n📊 **İlk Yarı Skoru:** {takim_1_adi} {t1_skor} - {t2_skor} {takim_2_adi}\nDevre arası başladı (15 saniye)...")
-        await asyncio.sleep(15)
-        
-    # --- İKİNCİ YARI (20 POZİSYON) ---
-    if mac_devam_ediyor:
-        await ctx.send(f"🔥 **[46'] [Erdem]:** Sevgili seyirciler, takımlar sahaya döndü. İkinci yarıda yeniden mikrofondayız. Berat, ikinci yarıdan beklentin ne?")
-        await asyncio.sleep(3)
-        await ctx.send(f"🗣 **[Berat]:** Erdem iki takım da risk alacaktır, gol veya goller izleyebiliriz. İkinci yarı başladı!")
 
-    ikinci_yari_dakikalar = [47, 49, 51, 54, 56, 59, 61, 64, 66, 68, 71, 73, 75, 78, 80, 83, 85, 87, 89, 90]
-    for dak in ikinci_yari_dakikalar:
-        if not mac_devam_ediyor: break
-        await asyncio.sleep(7)
-        t1_skor, t2_skor = await pozisyon_oynat(ctx, dak, t1_skor, t2_skor)
-                
-    # --- UZATMALAR (10 POZİSYON) ---
-    if mac_devam_ediyor and t1_skor == t2_skor:
-        await ctx.send(f"🚨 **[90'] [Erdem]:** Eşitlik bozulmadı! Maç uzatmalara gidiyor seyirciler!\n🗣 **[Berat]:** Fizik gücü yüksek olanın kazanacağı dakikalara girdik Erdem.")
-        await asyncio.sleep(8)
-        
-        uzat_dakikalar = [93, 96, 99, 102, 105, 108, 111, 114, 117, 120]
-        for dak in uzat_dakikalar:
-            if not mac_devam_ediyor: break
-            await asyncio.sleep(7)
-            t1_skor, t2_skor = await pozisyon_oynat(ctx, dak, t1_skor, t2_skor)
+        await ctx.send(
+            f"🏁 **[Erdem]:** "
+            f"Ve maç sona erdi!\n\n"
+            f"📊 Final Skoru:\n"
+            f"{takim_1_adi} {t1_skor} - "
+            f"{t2_skor} {takim_2_adi}"
+        )
 
-    # --- SERİ PENALTILAR ---
-    if mac_devam_ediyor and t1_skor == t2_skor:
-        await ctx.send(f"🔥 **[120'] [Erdem]:** İnanılmaz! Uzatmalarda da düğüm çözülmedi. İş penaltılara kaldı Berat!\n🗣 **[Berat]:** Tamamen şans ve kaleci becerisi Erdem, nefesler tutuldu.")
-        await asyncio.sleep(8)
-        
-        p1_skor, p2_skor = 0, 0
-        for atis in range(1, 6):
-            if not mac_devam_ediyor: break
-            
-            # Takım 1
-            if takim_1_kadro:
-                o1 = random.choice(takim_1_kadro)
-                await ctx.send(f"🎯 **[{takim_1_adi}]** {o1} penaltı için topun başında geliyor...")
-                await asyncio.sleep(4)
-                if random.random() < 0.75:
-                    p1_skor += 1
-                    await ctx.send(f"⚽ **[Erdem]: GOOLL!** {o1} kaleciyi çaresiz bıraktı! (Penaltılar: {p1_skor} - {p2_skor})")
-                else:
-                    await ctx.send(f"❌ **[Erdem]: KAÇTI!** {o1} kaleciyi geçemedi! (Penaltılar: {p1_skor} - {p2_skor})")
-                
-            # Takım 2
-            if takim_2_kadro:
-                o2 = random.choice(takim_2_kadro)
-                await ctx.send(f"🎯 **[{takim_2_adi}]** Şimdi cevap vermek için {o2} geliyor...")
-                await asyncio.sleep(4)
-                if random.random() < 0.75:
-                    p2_skor += 1
-                    await ctx.send(f"⚽ **[Erdem]: GOOLL!** {o2} ağları havalandırdı! (Penaltılar: {p1_skor} - {p2_skor})")
-                else:
-                    await ctx.send(f"❌ **[Erdem]: KAÇTI!** Top dışarıda! (Penaltılar: {p1_skor} - {p2_skor})")
+    # RESET
 
-        # Seri penaltılarda ölüm kalış devresi
-        seri_no = 6
-        while mac_devam_ediyor and p1_skor == p2_skor:
-            await ctx.send(f"🔄 **[Erdem]:** Eşitlik yine bozulmadı! Tekli penaltılara geçiyoruz. Berat kalbim dayanmıyor!")
-            await asyncio.sleep(4)
-            
-            o1 = random.choice(takim_1_kadro) if takim_1_kadro else "Oyuncu"
-            await ctx.send(f"🎯 **[{takim_1_adi}]** {o1} topun gerisinde...")
-            await asyncio.sleep(4)
-            if random.random() < 0.75:
-                p1_skor += 1
-                await ctx.send(f"⚽ **[Erdem]: VE GOL!** {o1} çok soğukkanlı! (Penaltılar: {p1_skor} - {p2_skor})")
-            else:
-                await ctx.send(f"❌ **[Erdem]: KAÇIRDI!** {o1} kaçırdı, büyük fırsat! (Penaltılar: {p1_skor} - {p2_skor})")
-                
-            o2 = random.choice(takim_2_kadro) if takim_2_kadro else "Oyuncu"
-            await ctx.send(f"🎯 **[{takim_2_adi}]** {o2} maçı bitirmek ya da uzatmak için geliyor...")
-            await asyncio.sleep(4)
-            if random.random() < 0.75:
-                p2_skor += 1
-                await ctx.send(f"⚽ **[Erdem]: GOL!** Seri devam ediyor! (Penaltılar: {p1_skor} - {p2_skor})")
-            else:
-                await ctx.send(f"❌ **[Erdem]: KAÇTI!** İnanılmaz bir dram!")
-                
-            seri_no += 1
-            
-        await ctx.send(f"🏆 **[Erdem]: VE MAÇ BİTTİ!** Penaltılar neticesinde kupanın sahibi **{takim_1_adi if p1_skor > p2_skor else takim_2_adi}** oluyor!\n🗣 **[Berat]:** Müthiş bir football şöleni izledik, şampiyonu tebrik ederiz Erdem. Yayını kapatıyoruz.")
+    takim_1_adi = "Ev Sahibi"
+    takim_1_kadro = {}
 
-    else:
-        if mac_devam_ediyor:
-            await ctx.send(f"🏁 **[90'+2] [Erdem]:** Ve son düdük çaldı! Bu muhteşem 40 pozisyonluk maratonun galibi belli oldu!\n🗣 **[Berat]:** Hak edilmiş bir galibiyet Erdem, kazananı kutlarız.\n🏆 **Maç Sonucu:** {takim_1_adi} {t1_skor} - {t2_skor} {takim_2_adi}")
-    
-    # Sıfırlama
-    takim_1_adi, takim_1_kadro = "Ev Sahibi", []
-    takim_2_adi, takim_2_kadro = "Deplasman", []
+    takim_2_adi = "Deplasman"
+    takim_2_kadro = {}
+
     mac_devam_ediyor = False
 
-@bot.command()
-async def maçbitir(ctx):
-    global mac_devam_ediyor, takim_1_adi, takim_1_kadro, takim_2_adi, takim_2_kadro
+# =========================
+# MAÇ BİTİR
+# =========================
+
+@bot.command(name="macbitir")
+async def macbitir(ctx):
+
+    global mac_devam_ediyor
+
+    global takim_1_adi
+    global takim_1_kadro
+
+    global takim_2_adi
+    global takim_2_kadro
+
     mac_devam_ediyor = False
-    takim_1_adi, takim_1_kadro = "Ev Sahibi", []
-    takim_2_adi, takim_2_kadro = "Deplasman", []
-    await ctx.send("⏹ Spiker Erdem ve Berat yayını acil durum nedeniyle erken kapatıyor, takımlar sıfırlandı.")
-threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
-# BOT TOKENİNİ BURAYA YAPIŞTIR
-bot.run(os.environ.get('DISCORD_TOKEN'))
+
+    takim_1_adi = "Ev Sahibi"
+    takim_1_kadro = {}
+
+    takim_2_adi = "Deplasman"
+    takim_2_kadro = {}
+
+    await ctx.send(
+        "⏹ Maç zorla bitirildi."
+    )
+
+# =========================
+# TOKEN
+# =========================
+
+bot.run(
+    os.environ.get("DISCORD_TOKEN")
+            )
