@@ -3,7 +3,8 @@ from discord.ext import commands
 import asyncio
 import random
 from flask import Flask
-import threading
+import threadingi 
+import os
 
 app = Flask('')
 @app.route('/')
