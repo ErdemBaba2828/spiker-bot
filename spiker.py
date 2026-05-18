@@ -285,4 +285,4 @@ async def maçbitir(ctx):
     await ctx.send("⏹ Spiker Erdem ve Berat yayını acil durum nedeniyle erken kapatıyor, takımlar sıfırlandı.")
 threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
 # BOT TOKENİNİ BURAYA YAPIŞTIR
-bot.run("BURADA_SENIN_GIZLI_BOT_SIFREN_YAZIYOR")
+bot.run(os.environ.get('DISCORD_TOKEN'))
